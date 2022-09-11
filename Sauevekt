@@ -1,0 +1,252 @@
+
+#include <EEPROM.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <HX711_ADC.h>
+
+//defining the OLED monitor
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+//initiating the Loadcell
+HX711_ADC LoadCell(6, 5); // parameters: dt pin, sck pin
+
+
+
+
+int tilstand = 1;   //modus vekt
+int addr = 0;       //for EEProom
+int bt1;  //zero
+int bt2 ; //Calibrate
+int bt3  ; //Calibrate
+
+int v_old;
+//button state variables
+int Button_state;
+int Button_state_old;
+int Button_state1;
+int Button_state_old1;
+int vig = 0;
+//calibration value
+int default_v = 700;
+float Weight;
+
+
+int v = EEPROM.read(addr);    //loading value from eeproom
+
+void setup() {
+  // put your setup code here, to run once:
+
+  //initiating monitor
+  // Serial.begin(9600);
+  // Serial.print("HELLO");
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.print("starter");
+  display.setCursor(0, 15);
+  display.print("opp");
+  display.display();
+
+  //initiating loadcell
+  LoadCell.begin(); // start connection to HX711
+  LoadCell.start(2000); // load cells gets 2000ms of time to stabilize
+  LoadCell.setCalFactor(46000000.0); // calibration factor for load cell => strongly dependent on your individual setup
+
+  //initiating buttons
+  pinMode(13, INPUT_PULLUP);
+  pinMode(10, INPUT_PULLUP);
+  pinMode(9, INPUT_PULLUP);
+
+
+  delay(2000);
+  display.clearDisplay();
+  display.display();
+}
+
+
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  bt1 = digitalRead(13);
+  bt2 = digitalRead(10);
+  bt3 = digitalRead(9);
+  //v = default_v;
+  switch (tilstand) {
+    case 1:
+
+
+      // display.setCursor(0, 0);
+      //display.println("Vekt:");
+      //display.display();
+      LoadCell.update(); // retrieves data from the load cell
+      Weight = LoadCell.getData(); // get output value
+      //display.clearDisplay();
+      display.setTextSize(4);
+      display.setTextColor(WHITE);
+      display.setCursor(0, 0);
+      display.print(Weight);
+      display.setCursor(0, 0);
+      display.display();
+      display.setCursor(0, 0);
+      display.setTextColor(WHITE, BLACK);
+      display.print(Weight);
+
+      display.setTextSize(2);
+      display.setCursor(0, 45);
+      //display.print(Weight);
+      display.print("kg");
+      display.display();
+
+      //vig = vig + 1;
+
+      if (bt3 == HIGH and bt2 == HIGH) {
+        tilstand = 2;
+      }
+
+
+      if (bt1 == HIGH and bt3==HIGH) {
+        v = default_v;
+        display.clearDisplay();
+         display.setCursor(0, 0);
+      display.print("Def-Cal-Val");
+      display.setCursor(0, 15);
+      display.print(default_v);
+     display.display();
+
+     delay(2000);
+
+      display.setCursor(0, 0);
+      display.setTextColor(WHITE, BLACK);
+      display.print("De.Cal.Val");
+
+      display.setCursor(0, 15);
+      display.setTextColor(WHITE, BLACK);
+      display.print(default_v);
+      display.display();
+      }
+      delay(100);
+    break;
+    
+    case 2:
+     display.setCursor(0, 0);
+      display.print("Calibrate");
+      display.setCursor(0, 15);
+      display.print("factor nr:");
+        display.setCursor(0, 35);
+      display.print(v);
+    
+      display.display();
+       //display.setCursor(0, 0);
+      //display.setTextColor(WHITE, BLACK);
+     // display.print(Weight);
+
+//      display.setTextSize(2);
+//       display.setCursor(0, 45);
+//      //display.print(Weight);
+//      display.print("kg");
+//      display.display();
+//display.setCursor(0, 45);
+//      
+//          display.println(v);
+     
+      // Her legger vi pluss 1 på kalibreringstallet
+     
+
+      if (bt2 == HIGH ) {
+        Button_state = HIGH;
+        
+
+
+        if (Button_state != Button_state_old ) {
+          Button_state_old = HIGH ;
+          v = v + 1;
+          display.setCursor(0, 35);
+          display.setTextColor(WHITE, BLACK);
+          display.println(v);
+          display.setCursor(0, 35);
+          display.println(v);
+          display.display();
+          
+          delay(199);
+
+        }
+
+      }
+      else {
+        Button_state = LOW;
+        Button_state_old = LOW;
+      }
+     
+
+      //Her legger vi på Minus 1 på kalibreringstallet
+//    display.setCursor(0, 45);
+//          display.println("      ");
+//          display.println(v);
+      if (bt3 == HIGH) {
+        Button_state1 = HIGH;
+        if (Button_state1 != Button_state_old1) {
+          Button_state_old1 = HIGH;
+          v = v - 1;
+          display.setCursor(0, 35);
+          display.setTextColor(WHITE, BLACK);
+          display.println(v);
+          display.setCursor(0, 35);
+          display.println(v);
+          display.display();
+
+
+        }
+
+      }
+      else {
+        Button_state1 = LOW;
+        Button_state_old1 = LOW;
+      }
+
+      if (bt1 == HIGH) {
+      EEPROM.write(addr, v);
+        tilstand = 1;
+        display.clearDisplay();
+        
+      }
+      v_old = v;
+    break;
+    case 3:
+     //Serial.print(tilstand);
+    break; 
+  }
+}
+
+//
+//void loop() {
+//  // put your main code here, to run repeatedly:
+//display.clearDisplay();
+//i+=1;
+//  LoadCell.update(); // retrieves data from the load cell
+//  float Weight = LoadCell.getData(); // get output value
+// display.setTextSize(4);
+//  display.setTextColor(WHITE);
+//  display.setCursor(0,0);
+//  display.println(Weight);
+//
+//display.setTextSize(2);
+//display.setTextColor(WHITE);
+//display.setCursor(0,45);
+//display.println("      ");
+//
+//display.setCursor(0,45);
+//  display.print(i);
+//
+//  display.display();
+//  delay(1000);
+//}
